@@ -64,24 +64,77 @@ async function main() {
   });
 
   while (true) {
-    const gameName = await askQuestion(
+    const command = await askQuestion(
       rl,
-      '\nDigite o nome do jogo (ou "sair" para encerrar): ',
+      '\nDigite comando (resultado/buscar/sair): ',
     );
 
-    const normalizedInput = String(gameName).trim().toLowerCase();
+    const cmd = String(command).trim().toLowerCase();
 
-    if (!normalizedInput || normalizedInput === "sair") {
+    if (!cmd || cmd === "sair") {
       break;
     }
 
-    try {
-      const response = await requestGameResult(socket, gameName);
-      console.log(`Status: ${response.status}`);
-      console.log(`Resultado: ${response.result}`);
-    } catch (error) {
-      console.error("Falha na consulta:", error.message);
+    if (cmd === "resultado") {
+      const gameName = await askQuestion(rl, 'Nome do jogo (ex: Brasil x França): ');
+      try {
+        console.log('[tcp] -> emit get_game_result', { to: SERVER_URL, payload: gameName });
+        const response = await requestGameResult(socket, gameName);
+        console.log('[tcp] <- game_result_response', response);
+        console.log(`Status: ${response.status}`);
+        console.log(`Resultado: ${response.result}`);
+      } catch (error) {
+        console.error("Falha na consulta:", error.message);
+      }
+      continue;
     }
+
+    if (cmd === "buscar") {
+      const query = await askQuestion(rl, 'Pesquisar partidas (ex: brasil x marrocos ou apenas brasil): ');
+      const normalized = String(query).trim();
+      if (!normalized) {
+        console.log('Entrada vazia, pulando.');
+        continue;
+      }
+
+      // Promise wrapper for search response
+      const searchPromise = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          socket.off('search_match_response', onResp);
+          reject(new Error('Tempo limite aguardando resposta de busca.'));
+        }, 5000);
+
+        const onResp = (response) => {
+          clearTimeout(timeout);
+          socket.off('search_match_response', onResp);
+          resolve(response);
+        };
+
+        socket.on('search_match_response', onResp);
+      });
+
+      console.log('[tcp] -> emit search_match', { to: SERVER_URL, payload: normalized });
+      socket.emit('search_match', { query: normalized });
+
+      try {
+        const resp = await searchPromise;
+        console.log('[tcp] <- search_match_response', resp);
+        if (Array.isArray(resp.matches) && resp.matches.length) {
+          console.log(`Encontradas ${resp.matches.length} partidas:`);
+          resp.matches.slice(0, 20).forEach((m) => {
+            console.log(`- ${m.title} | ${m.score} | ${m.statusLabel}`);
+          });
+        } else {
+          console.log('Nenhuma partida encontrada para essa consulta.');
+        }
+      } catch (error) {
+        console.error('Erro na busca:', error.message);
+      }
+
+      continue;
+    }
+
+    console.log('Comando desconhecido. Use "resultado", "buscar" ou "sair".');
   }
 
   rl.close();

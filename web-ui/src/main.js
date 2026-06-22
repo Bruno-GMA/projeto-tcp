@@ -10,6 +10,50 @@ const connectionState = document.querySelector('#connection-state');
 const matchList = document.querySelector('#match-list');
 const matchDetail = document.querySelector('#match-detail');
 const matchCount = document.querySelector('#match-count');
+const searchForm = document.querySelector('#search-form');
+const searchInput = document.querySelector('#search-input');
+const searchBtn = document.querySelector('#search-btn');
+const searchList = document.createElement('ul');
+searchList.id = 'search-suggestions';
+searchList.className = 'search-suggestions hidden';
+if (searchInput && searchInput.parentElement) {
+  searchInput.parentElement.appendChild(searchList);
+}
+
+let suggestionItems = [];
+let focusedSuggestion = -1;
+
+function clearSuggestions() {
+  suggestionItems = [];
+  focusedSuggestion = -1;
+  searchList.innerHTML = '';
+  searchList.classList.add('hidden');
+}
+
+function renderSuggestions(list) {
+  suggestionItems = list.slice(0, 10);
+  if (!suggestionItems.length) {
+    clearSuggestions();
+    return;
+  }
+
+  searchList.innerHTML = suggestionItems
+    .map((s, idx) => `<li role="option" data-idx="${idx}" tabindex="-1">${escapeHtml(s)}</li>`)
+    .join('');
+  searchList.classList.remove('hidden');
+  focusedSuggestion = -1;
+}
+
+function pickSuggestion(index) {
+  const value = suggestionItems[index];
+  if (!value) return;
+  searchInput.value = value;
+  clearSuggestions();
+  // trigger search immediately
+  socket.emit('search_match', { query: value });
+  matchList.className = 'match-list empty-state';
+  matchList.textContent = 'Buscando partidas...';
+}
 
 let matches = [];
 let selectedMatchId = null;
@@ -157,3 +201,107 @@ socket.on('match_detail_response', ({ match, error = null }) => {
     renderDetail(match);
   }
 });
+
+// Search interaction
+if (searchForm && searchInput) {
+  searchForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const query = String(searchInput.value || '').trim();
+    if (!query) return;
+
+    console.log('[tcp] -> search_match', { to: SERVER_URL, query });
+    socket.emit('search_match', { query });
+    // Optionally provide immediate feedback
+    matchList.className = 'match-list empty-state';
+    matchList.textContent = 'Buscando partidas...';
+  });
+
+  // Autocomplete: request suggestions as user types
+  let debounceTimer = null;
+  searchInput.addEventListener('input', (e) => {
+    const q = String(searchInput.value || '').trim();
+    clearTimeout(debounceTimer);
+    if (!q) {
+      clearSuggestions();
+      return;
+    }
+
+    debounceTimer = setTimeout(() => {
+      // reuse server search but expect only titles back; server returns matches
+      socket.emit('search_match', { query: q });
+    }, 180);
+  });
+
+  // receive suggestions (reuse same event) and show as autocomplete
+  socket.on('search_match_response', ({ matches: found = [], error = null }) => {
+    console.log('[tcp] <- search_match_response', { count: found.length, error });
+    if (error) {
+      clearSuggestions();
+      return;
+    }
+
+    // map to display strings (title)
+    const titles = found.map((m) => m.title || `${m.homeTeam} x ${m.awayTeam}`);
+    renderSuggestions(titles);
+  });
+
+  // keyboard navigation for suggestions
+  searchInput.addEventListener('keydown', (e) => {
+    if (searchList.classList.contains('hidden')) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusedSuggestion = Math.min(focusedSuggestion + 1, suggestionItems.length - 1);
+      updateSuggestionFocus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusedSuggestion = Math.max(focusedSuggestion - 1, 0);
+      updateSuggestionFocus();
+    } else if (e.key === 'Enter') {
+      if (focusedSuggestion >= 0) {
+        e.preventDefault();
+        pickSuggestion(focusedSuggestion);
+      }
+    } else if (e.key === 'Escape') {
+      clearSuggestions();
+    }
+  });
+
+  function updateSuggestionFocus() {
+    const items = Array.from(searchList.querySelectorAll('li'));
+    items.forEach((it, idx) => {
+      if (idx === focusedSuggestion) {
+        it.classList.add('focused');
+        it.scrollIntoView({ block: 'nearest' });
+      } else {
+        it.classList.remove('focused');
+      }
+    });
+  }
+
+  searchList.addEventListener('click', (e) => {
+    const li = e.target.closest('li[data-idx]');
+    if (!li) return;
+    const idx = Number(li.dataset.idx);
+    pickSuggestion(idx);
+  });
+
+  socket.on('search_match_response', ({ matches: found = [], error = null }) => {
+    console.log('[tcp] <- search_match_response', { count: found.length, error });
+    if (error) {
+      matchList.className = 'match-list empty-state';
+      matchList.textContent = error || 'Erro ao buscar partidas.';
+      matchCount.textContent = '0';
+      return;
+    }
+
+    matches = found;
+    selectedMatchId = matches[0]?.id ?? null;
+    renderMatchList();
+    if (selectedMatchId) {
+      renderDetail(matches[0]);
+    } else {
+      matchDetail.className = 'detail-card empty-state';
+      matchDetail.textContent = 'Nenhuma partida corresponde à pesquisa.';
+    }
+  });
+}

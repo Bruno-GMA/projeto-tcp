@@ -208,10 +208,10 @@ function generateMockMatches() {
     "Wales", "Senegal", "Cameroon", "United States", "Qatar", "Saudi Arabia", "Tunisia", "Canada",
     "Australia", "Costa Rica", "Ecuador", "Peru", "Colombia", "Belgium", "Ghana", "Serbia"
   ];
-  
+
   const matches = [];
   let idCounter = 537327;
-  
+
   // 1. Mexico vs South Africa
   matches.push({
     id: idCounter++,
@@ -290,7 +290,7 @@ function generateMockMatches() {
     if (homeTeam === awayTeam) {
       awayTeam = teams[(awayIndex + 1) % teams.length];
     }
-    
+
     if (
       (homeTeam === "Brazil" && awayTeam === "Morocco") ||
       (homeTeam === "Morocco" && awayTeam === "Brazil") ||
@@ -305,12 +305,12 @@ function generateMockMatches() {
     const matchday = Math.floor(i / 16) + 1;
     const groupLetter = String.fromCharCode(65 + (Math.floor(i / 6) % 8)); // Groups A to H
     const status = i < 37 ? "FINISHED" : "TIMED";
-    
+
     const homeScore = status === "FINISHED" ? (i % 4) : null;
     const awayScore = status === "FINISHED" ? ((i + 1) % 3) : null;
     const halfHome = status === "FINISHED" ? Math.floor(homeScore / 2) : null;
     const halfAway = status === "FINISHED" ? Math.floor(awayScore / 2) : null;
-    
+
     let winner = null;
     if (status === "FINISHED") {
       winner = homeScore > awayScore ? "HOME_TEAM" : (homeScore < awayScore ? "AWAY_TEAM" : "DRAW");
@@ -442,18 +442,23 @@ async function startServer() {
   });
 
   io.on("connection", (socket) => {
-    console.log(`Cliente conectado: ${socket.id}`);
+    const clientAddr = socket.handshake.address || socket.conn.remoteAddress || 'unknown';
+    console.log(`Cliente conectado: ${socket.id} (${clientAddr})`);
 
     socket.on("get_game_result", async (payload = {}) => {
       try {
+        console.log(`[tcp] <- get_game_result from ${socket.id} (${clientAddr})`, payload);
         const { game_name: gameName } = payload;
         const response = await fetchWorldCupResultByQuery(gameName);
+        console.log(`[tcp] -> game_result_response to ${socket.id} (${clientAddr})`, response);
         socket.emit("game_result_response", response);
       } catch (error) {
-        socket.emit("game_result_response", {
+        const resp = {
           status: "not_found",
           result: `Não foi possível consultar a Copa do Mundo neste momento. ${error.status ? `HTTP ${error.status}.` : ""}`.trim(),
-        });
+        };
+        console.log(`[tcp] -> game_result_response (error) to ${socket.id} (${clientAddr})`, resp);
+        socket.emit("game_result_response", resp);
         console.error(`Erro ao processar requisição de ${socket.id}:`, {
           message: error.message,
           status: error.status,
@@ -466,10 +471,33 @@ async function startServer() {
     socket.on("get_world_cup_matches", async () => {
       try {
         const matches = await fetchMatchBrowserData();
+        console.log(`[tcp] -> world_cup_matches_response to ${socket.id} (${clientAddr}) matches=${matches.length}`);
         socket.emit("world_cup_matches_response", { matches });
       } catch (error) {
         socket.emit("world_cup_matches_response", { matches: [], error: "Não foi possível carregar as partidas." });
         console.error(`Erro ao gerar lista de partidas para ${socket.id}:`, {
+          message: error.message,
+          status: error.status,
+          url: error.url,
+          preview: error.preview,
+        });
+      }
+    });
+
+    // New: handle search requests from client
+    socket.on('search_match', async (payload = {}) => {
+      try {
+        console.log(`[tcp] <- search_match from ${socket.id} (${clientAddr})`, payload);
+        const query = String(payload?.query ?? '').trim();
+        const fixtures = await fetchWorldCupFixtures();
+        const matches = fixtures.filter((f) => fixtureMatchesQuery(f, query)).map(toMatchSummary);
+        const response = { matches };
+        console.log(`[tcp] -> search_match_response to ${socket.id} (${clientAddr}) matches=${matches.length}`);
+        socket.emit('search_match_response', response);
+      } catch (error) {
+        console.log(`[tcp] -> search_match_response (error) to ${socket.id} (${clientAddr})`);
+        socket.emit('search_match_response', { matches: [], error: 'Erro ao buscar partidas.' });
+        console.error(`Erro ao processar busca para ${socket.id}:`, {
           message: error.message,
           status: error.status,
           url: error.url,

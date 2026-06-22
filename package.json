@@ -1,0 +1,16 @@
+{
+  "name": "projeto-tcp-copa",
+  "version": "1.0.0",
+  "description": "Sistema cliente-servidor com Socket.io para consulta de resultados de jogos da Copa do Mundo.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "client": "node client.js",
+    "test": "node tester.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  }
+}

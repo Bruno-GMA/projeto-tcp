@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Copa Resultados</title>
+    <meta name="description" content="Navegue pelas partidas da Copa do Mundo e veja placar e detalhes ao clicar." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <main class="card browse-layout">
+        <section class="hero">
+          <p class="eyebrow">Socket.io + Vite</p>
+          <h1>Partidas da Copa do Mundo</h1>
+          <p class="subtitle">A lista já vem pronta. Clique em uma partida para ver o placar, o status e os detalhes disponíveis do jogo.</p>
+        </section>
+
+        <section class="status-bar">
+          <span id="connection-state" class="badge badge-warn">Conectando...</span>
+          <span class="hint">Fonte: <strong>football-data.org v4</strong></span>
+        </section>
+
+        <section class="browser-grid">
+          <aside class="match-list-panel">
+            <div class="panel-heading">
+              <h2>Partidas</h2>
+              <span id="match-count" class="counter">0</span>
+            </div>
+            <div id="match-list" class="match-list empty-state">Carregando partidas...</div>
+          </aside>
+
+          <section class="detail-panel" aria-live="polite">
+            <div class="panel-heading">
+              <h2>Detalhes</h2>
+            </div>
+            <div id="match-detail" class="detail-card empty-state">Selecione uma partida para ver os detalhes.</div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

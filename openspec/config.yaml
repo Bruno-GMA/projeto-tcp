@@ -1,0 +1,53 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+context: |
+  Projeto: sistema distribuído cliente-servidor para consulta de resultados de jogos da Copa do Mundo.
+
+  Stack:
+  - Node.js em CommonJS
+  - Socket.io para simular comunicação orientada a conexão/TCP via WebSockets
+  - socket.io-client no cliente e nos testes automatizados
+
+  Contrato de eventos:
+  - Client -> Server: get_game_result { game_name: string }
+  - Server -> Client: game_result_response { status: "success" | "not_found", result: string }
+
+  Requisitos funcionais:
+  - Servidor escuta na porta 5000
+  - Aceita múltiplas conexões simultâneas
+  - Base em memória com jogos já ocorridos
+  - Resposta amigável quando o jogo não existir
+  - Cliente interativo via terminal usando readline
+  - Script de testes automatizados com consultas sequenciais e em rajada
+
+  Conventions:
+  - Preferir JavaScript limpo com async/await e Promises
+  - Manter nomes de eventos estáveis e documentados
+  - Preservar compatibilidade com abordagem SDD e geração de artefatos OpenSpec
+  - Evitar acoplamento entre transporte, domínio e interface de terminal
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Descrever claramente problema, objetivo, impacto e não-objetivos.
+    - Sempre alinhar o fluxo de eventos Socket.io com o contrato SDD.
+    - Manter a proposta curta e objetiva.
+  design:
+    - Separar responsabilidades de domínio, transporte e interação com o usuário.
+    - Explicitar modelos de eventos, payloads e fluxo de erro.
+    - Incluir considerações de concorrência e escalabilidade leve.
+  tasks:
+    - Quebrar trabalho em passos verificáveis.
+    - Manter cada tarefa pequena e testável.
+    - Incluir atualização de documentação ou artefatos quando necessário.
